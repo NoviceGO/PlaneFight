@@ -1,9 +1,12 @@
-import { _decorator, Component, Enum, EventTouch, Input, input, instantiate, Node, Prefab, Vec3 } from 'cc';
+import { _decorator, Animation, Collider2D, Component, Contact2DType, Enum, EventTouch, Input, input, instantiate, Node, Prefab, Sprite, Vec3 } from 'cc';
+import { Reward, RewardType } from './Reward';
+import { GameManager } from './GameManager';
 const { ccclass, property } = _decorator;
 
 enum ShootType{
     SHOOT_ONE = 1, //单发
     SHOOT_TWO = 2, //双发
+    None = 3 //无发射
 }
 
 @ccclass('Player')
@@ -30,23 +33,112 @@ export class Player extends Component {
 
     @property({ type: Enum(ShootType) })
     shootType:ShootType = ShootType.SHOOT_ONE; //默认单发
+    
+
+    @property
+    lifeCount:number = 3;
+    @property
+    invincibleTime:number = 2; //无敌时间，单位秒
+
+    @property
+    twoShootDuration:number = 5; //双发持续时间，单位秒
+    twoShootTimer:number = 0; //双发计时器
+
+    isInvincible:boolean = false; //是否处于无敌状态
+    invincibleTimer:number = 0; //无敌计时器
+
+    @property(Animation)
+    animation: Animation | null = null;
+    @property
+    animationHit: string = '';
+    @property
+    animationDown: string = '';
 
 
-
+    collider:Collider2D = null;
     private shootTimer:number = 0; //发射计时器
-   
+    lastReward:Reward = null;
 
 
 
     protected onLoad(): void {
         input.on(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
+
+        this.collider = this.node.getChildByName("Body").getComponent(Collider2D);   
+        // 监听碰撞事件
+        if(this.collider){
+            this.collider.on(Contact2DType.BEGIN_CONTACT,this.onBeginContact, this);
+        }
+                
+
     }
+    onBeginContact( selfCollider: Collider2D, otherCollider: Collider2D, contact?: any ) {
+        
+        const reward = otherCollider.getComponent(Reward);
+        if(reward){
+            this.onContactToReward(reward);
+        }else{
+            this.onContactToEnemy();
+        }
+        
+    }
+  
+    onContactToEnemy(){
+        if(this.isInvincible) return; //处于无敌状态，忽略碰撞
+        this.isInvincible = true;
+        this.invincibleTimer = 0; //重置计时器
+        // 处理碰撞逻辑
+        this.lifeCount -= 1;
+        
+        if(this.lifeCount>0){
+            this.animation.play(this.animationHit);
+           
+        }else{
+            this.shootType = ShootType.None; //停止发射
+            this.animation.play(this.animationDown);
+            // 播放完爆炸动画后销毁敌机节点
+            if(this.collider) this.collider.enabled = false; // 禁用碰撞体，防止重复碰撞
+        }
+    }
+    onContactToReward(reward:Reward){
+        if(this.lastReward === reward) return; //已经处理过该奖励，忽略
+        this.lastReward = reward;
+        // 碰撞到奖励
+        switch(reward.rewardType){
+            case 0:
+                this.transitionToTwoShoot();
+                break;
+            case 1:
+                GameManager.getInstance().addBomb();
+                break;
+        }
+
+        reward.getComponent(Collider2D).enabled = false; // 禁用碰撞体，防止重复碰撞
+        reward.getComponent(Sprite).enabled = false; // 隐藏奖励
+    }
+
+
+    transitionToOneShoot(){
+        //切换为单发模式
+        this.shootType = ShootType.SHOOT_ONE;
+    }
+    transitionToTwoShoot(){
+        //切换为双发模式
+        this.shootType = ShootType.SHOOT_TWO;
+        this.twoShootTimer = 0; //重置计时器
+    }
+    transitionToBomb(){}
+
     
     protected onDestroy(): void {
         input.off(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
+         if(this.collider){
+            this.collider.off(Contact2DType.BEGIN_CONTACT,this.onBeginContact, this);
+        }
     }
 
     onTouchMove(event: EventTouch) {
+        if(this.lifeCount <= 0) return; // 玩家已死亡，禁止移动
         const p = this.node.getPosition();
         //获取触摸移动的距离，event.getDelta() 返回的是一个 Vec2 对象，作用是获取触摸点相对于上一个触摸点的位移
         let targetPos = new Vec3(p.x + event.getDeltaX(), p.y + event.getDeltaY(), p.z);
@@ -76,9 +168,18 @@ export class Player extends Component {
                 this.twoShoot(dt);
                 break;
         }
-    }
 
-    
+        //无敌计时
+        if(this.isInvincible){
+            this.collider.enabled = false; //禁用碰撞体
+            this.invincibleTimer += dt; //累加时间
+            if(this.invincibleTimer >= this.invincibleTime){
+                this.isInvincible = false; //结束无敌状态
+                this.collider.enabled = true; //禁用碰撞体
+            }
+        }
+
+    }
 
     oneShoot(dt:number){
         this.shootTimer += dt; //累加时间
@@ -92,10 +193,19 @@ export class Player extends Component {
     }
 
     twoShoot(dt: number) {
+        
+        this.twoShootTimer += dt; //累加时间
+        if(this.twoShootTimer >= this.twoShootDuration){
+            //双发时间到，切换回单发 
+            this.transitionToOneShoot();
+            return
+        }
+        
+        //以下是子弹发射间隔逻辑
         this.shootTimer += dt; //累加时间
         if(this.shootTimer >= this.shootRate){   //达到发射频率
             this.shootTimer = 0; //重置计时器
-            const bullet1 = instantiate(this.bullet1Prefab);
+            const bullet1 = instantiate(this.bullet2Prefab);
             const bullet2 = instantiate(this.bullet2Prefab);
             this.bulletParent.addChild(bullet1);
             this.bulletParent.addChild(bullet2);

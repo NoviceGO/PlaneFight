@@ -5,5 +5,38 @@
       "width": 480,
       "height": 850
     }
-  }
+  },
+  "physics": {
+    "collisionGroups": [
+      {
+        "index": 1,
+        "name": "Bullent"
+      },
+      {
+        "index": 2,
+        "name": "Enemy"
+      },
+      {
+        "index": 3,
+        "name": "player"
+      },
+      {
+        "index": 4,
+        "name": "reward"
+      }
+    ],
+    "collisionMatrix": {
+      "0": 1,
+      "1": 4,
+      "2": 10,
+      "3": 20,
+      "4": 8
+    }
+  },
+  "layer": [
+    {
+      "name": "GAME",
+      "value": 1
+    }
+  ]
 }
