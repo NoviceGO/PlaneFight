@@ -2,13 +2,12 @@
   "ver": "1.1.50",
   "importer": "prefab",
   "imported": true,
-  "uuid": "4d9bec05-a427-4d0b-be73-bc4bc8f92870",
+  "uuid": "c44ff68e-50d2-41d5-b394-fdbf7c674d26",
   "files": [
     ".json"
   ],
   "subMetas": {},
   "userData": {
-    "syncNodeName": "Enemy0",
-    "persistent": false
+    "syncNodeName": "Reward2_Bomb"
   }
 }

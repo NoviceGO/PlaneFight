@@ -18,10 +18,18 @@ export class EnemyManager extends Component {
     @property
     enemy2SpawnRate:number = 3; //敌机生成频率，单位秒
 
+    @property(Prefab)
+    reward1:Prefab | null = null;
+    @property(Prefab)
+    reward2:Prefab | null = null;
+    @property
+    rewardSpawnRate:number = 3; //奖励生成频率，单位秒
+
     start() {
         this.schedule(() => this.getEnemyPrefab(this.enemy0), this.enemy0SpawnRate);
         this.schedule(() => this.getEnemyPrefab(this.enemy1), this.enemy1SpawnRate);
         this.schedule(() => this.getEnemyPrefab(this.enemy2), this.enemy2SpawnRate);
+        this.schedule(() => this.getEnemyPrefab("reward"), this.rewardSpawnRate);
     }
 
     update(deltaTime: number) {
@@ -32,14 +40,32 @@ export class EnemyManager extends Component {
         this.unschedule(() => this.getEnemyPrefab(this.enemy0));
         this.unschedule(() => this.getEnemyPrefab(this.enemy1));
         this.unschedule(() => this.getEnemyPrefab(this.enemy2));
+        this.unschedule(() => this.getEnemyPrefab("reward"));
     }
 
-    getEnemyPrefab(enemy:Prefab) {
-        const enemyPrefab = instantiate(enemy);
-        this.node.addChild(enemyPrefab);
+    getEnemyPrefab(enemy:Prefab| string) {
+        let prefabToSpawn: Prefab | null = null;
+        // 如果是奖励，则随机选择一种奖励生成,否则生成对应的敌机 
+        if (enemy === "reward") {
+            if (this.reward1 == null && this.reward2 == null) {
+                console.log("没有奖励可用");
+                return;
+            }
+            // 随机选择奖励类型
+            prefabToSpawn = (math.random() < 0.5) ? (this.reward1 ?? this.reward2) : (this.reward2 ?? this.reward1);
+        } else {
+            prefabToSpawn = enemy as Prefab;
+        }
+    
+        if (!prefabToSpawn) {
+            console.log("没有该类型敌机或奖励或 prefab 为 null");
+            return;
+        }
+    
+        const enemyPrefab = instantiate(prefabToSpawn);
         //设置敌机初始位置
         let posX: number;
-        switch(enemy){
+        switch(prefabToSpawn){
             case this.enemy0:
                 posX = math.randomRangeInt(-215,215);
                 enemyPrefab.setPosition(posX,450,0);
@@ -51,12 +77,16 @@ export class EnemyManager extends Component {
             case this.enemy2:
                 posX = math.randomRangeInt(-158,156);
                 enemyPrefab.setPosition(posX,550,0);
-                break;  
+                break;
+            case this.reward1:
+            case this.reward2:
+                posX = math.randomRangeInt(-207,207);
+                enemyPrefab.setPosition(posX,477,0);
+                break;
             default:
-                console.log("没有该类型敌机");
                 break;
         }
-        
+        this.node.addChild(enemyPrefab);
     }
 
 }
