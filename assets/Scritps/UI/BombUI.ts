@@ -12,14 +12,6 @@ export class BombUI extends Component {
     onBombChange(num: number) {
         this.bombNumber.string = num.toString();
     }
-
-    start() {
-    }
-    
-
-    update(deltaTime: number) {
-        
-    }
 }
 
 

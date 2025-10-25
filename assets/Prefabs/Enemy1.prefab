@@ -285,6 +285,11 @@
     "hp": 5,
     "animationHit": "Enemy1_Hit",
     "animationDown": "Enemy1_Down",
+    "score": 100,
+    "enemyAudio": {
+      "__uuid__": "fb431f75-e7eb-4066-8f3d-797f081574c6",
+      "__expectedType__": "cc.AudioClip"
+    },
     "_id": ""
   },
   {
@@ -385,6 +390,7 @@
       "__id__": 0
     },
     "fileId": "11Zp1MT2BFE656fXshM8u6",
+    "instance": null,
     "targetOverrides": []
   }
 ]

@@ -1,6 +1,8 @@
-import { _decorator, Animation, Collider2D, Component, Contact2DType, Enum, EventTouch, Input, input, instantiate, Node, Prefab, Sprite, Vec3 } from 'cc';
+import { _decorator, Animation, AudioClip, Collider2D, Component, Contact2DType, Enum, EventTouch, Input, input, instantiate, Node, Prefab, Sprite, Vec3 } from 'cc';
 import { Reward, RewardType } from './Reward';
 import { GameManager } from './GameManager';
+import { LifecountUI } from './UI/LifecountUI';
+import { AudioMgr } from './AudioMgr';
 const { ccclass, property } = _decorator;
 
 enum ShootType{
@@ -53,13 +55,28 @@ export class Player extends Component {
     animationHit: string = '';
     @property
     animationDown: string = '';
+    @property(LifecountUI)
+    lifeCountUI:LifecountUI = null;
+    @property(AudioClip)
+    bulletAudio:AudioClip = null;
+    @property(AudioClip)
+    getBombAudio:AudioClip = null;
+    @property(AudioClip)
+    getTwoShootAudio:AudioClip = null;
 
 
     collider:Collider2D = null;
     private shootTimer:number = 0; //发射计时器
     lastReward:Reward = null;
+    private _isPause: boolean = false;
 
+    public get isPause(): boolean {
+        return this._isPause;
+    }
 
+    public set isPause(value: boolean) {
+        this._isPause = value;
+    }
 
     protected onLoad(): void {
         input.on(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
@@ -69,6 +86,7 @@ export class Player extends Component {
         if(this.collider){
             this.collider.on(Contact2DType.BEGIN_CONTACT,this.onBeginContact, this);
         }
+        this.lifeCountUI.onLifeChange(this.lifeCount);
                 
 
     }
@@ -82,13 +100,19 @@ export class Player extends Component {
         }
         
     }
+
+    //单独处理血量，可以添加回血包等道具
+    onChangeLife(number:number){
+        this.lifeCount += number;
+        this.lifeCountUI.onLifeChange(this.lifeCount);
+    }
   
     onContactToEnemy(){
         if(this.isInvincible) return; //处于无敌状态，忽略碰撞
         this.isInvincible = true;
         this.invincibleTimer = 0; //重置计时器
         // 处理碰撞逻辑
-        this.lifeCount -= 1;
+        this.onChangeLife(-1);
         
         if(this.lifeCount>0){
             this.animation.play(this.animationHit);
@@ -96,6 +120,9 @@ export class Player extends Component {
         }else{
             this.shootType = ShootType.None; //停止发射
             this.animation.play(this.animationDown);
+            this.scheduleOnce(()=>{
+                GameManager.getInstance().gameOver();
+            },0.4);
             // 播放完爆炸动画后销毁敌机节点
             if(this.collider) this.collider.enabled = false; // 禁用碰撞体，防止重复碰撞
         }
@@ -106,9 +133,11 @@ export class Player extends Component {
         // 碰撞到奖励
         switch(reward.rewardType){
             case 0:
+                AudioMgr.inst.play(this.getTwoShootAudio,1);
                 this.transitionToTwoShoot();
                 break;
             case 1:
+                AudioMgr.inst.play(this.getBombAudio,1);
                 GameManager.getInstance().addBomb();
                 break;
         }
@@ -138,7 +167,7 @@ export class Player extends Component {
     }
 
     onTouchMove(event: EventTouch) {
-        if(this.lifeCount <= 0) return; // 玩家已死亡，禁止移动
+        if(this.lifeCount <= 0 || this.isPause) return; // 玩家已死亡，禁止移动,
         const p = this.node.getPosition();
         //获取触摸移动的距离，event.getDelta() 返回的是一个 Vec2 对象，作用是获取触摸点相对于上一个触摸点的位移
         let targetPos = new Vec3(p.x + event.getDeltaX(), p.y + event.getDeltaY(), p.z);
@@ -189,6 +218,7 @@ export class Player extends Component {
             this.bulletParent.addChild(bullet1); //将子弹添加到父节点下
             //设置子弹位置为发射位置,使用世界坐标,避免层级关系带来的位置偏移, 否则子弹位置会有偏差
             bullet1.setWorldPosition(this.bullet1Position.getWorldPosition());
+            AudioMgr.inst.play(this.bulletAudio,0.7);
         }
     }
 
@@ -212,6 +242,7 @@ export class Player extends Component {
             // //设置子弹位置为发射位置,使用世界坐标,避免层级关系带来的位置偏移, 否则子弹位置会有偏差
             bullet1.setWorldPosition(this.bullet2_1Position.getWorldPosition());
             bullet2.setWorldPosition(this.bullet2_2Position.getWorldPosition());
+            AudioMgr.inst.play(this.bulletAudio,0.7);
         }
 
 

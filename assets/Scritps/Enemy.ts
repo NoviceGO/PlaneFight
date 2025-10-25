@@ -1,4 +1,7 @@
-import { _decorator, Animation, Collider2D, Component, Contact2DType, Node, Sprite } from 'cc';
+import { _decorator, Animation, AudioClip, Collider2D, Component, Contact2DType, Node, Sprite } from 'cc';
+import { GameManager } from './GameManager';
+import { EnemyManager } from './EnemyManager';
+import { AudioMgr } from './AudioMgr';
 const { ccclass, property } = _decorator;
 
 @ccclass('Enemy')
@@ -16,8 +19,13 @@ export class Enemy extends Component {
     animationHit: string = '';
     @property
     animationDown: string = '';
+    @property
+    score:number = 10;
 
+    haveDead:boolean = false;
     collider:Collider2D = null;
+    @property(AudioClip)
+    enemyAudio:AudioClip = null;
 
     start() {
         // this.animation.play();
@@ -43,14 +51,8 @@ export class Enemy extends Component {
 
         if(this.hp>0){
             this.animation.play(this.animationHit);
-           
         }else{
-            this.animation.play(this.animationDown);
-            // 播放完爆炸动画后销毁敌机节点
-            if(this.collider) this.collider.enabled = false; // 禁用碰撞体，防止重复碰撞
-            this.scheduleOnce(()=>{
-                this.node.destroy();
-            }, 1); // 等待动画播放完毕后销毁节点
+            this.dead();
         }
     }
 
@@ -71,9 +73,27 @@ export class Enemy extends Component {
         if(this.collider){
             this.collider.off(Contact2DType.BEGIN_CONTACT,this.onBeginContact, this);
         }
+        EnemyManager.getInstance().removeEnemy(this.node);
     }
 
+    dead():void{
+        if(this.haveDead) return;
+        this.animation.play(this.animationDown);
+        // 播放完爆炸动画后销毁敌机节点
+        if(this.collider) this.collider.enabled = false; // 禁用碰撞体，防止重复碰撞
+        this.scheduleOnce(()=>{
+            this.node.destroy();
+        }, 1); // 等待动画播放完毕后销毁节点
+        AudioMgr.inst.play(this.enemyAudio,0.8);
+        GameManager.getInstance().addScoreTotal(this.score);
+        this.haveDead = true;
+    }
 
+    killNow():void{
+        if(this.hp<=0) return;
+        this.dead();
+
+    }
 }
 
 

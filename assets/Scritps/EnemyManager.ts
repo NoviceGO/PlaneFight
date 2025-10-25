@@ -1,8 +1,21 @@
-import { _decorator, Component, instantiate, math, Node, Prefab } from 'cc';
+import { _decorator, AudioClip, Component, EventTouch, Input, input, instantiate, math, Node, Prefab } from 'cc';
+import { GameManager } from './GameManager';
+import { Enemy } from './Enemy';
+import { AudioMgr } from './AudioMgr';
 const { ccclass, property } = _decorator;
 
 @ccclass('EnemyManager')
 export class EnemyManager extends Component {
+
+    private static instance:EnemyManager = null;
+    public static getInstance(): EnemyManager {
+        if (!EnemyManager.instance) {
+            EnemyManager.instance = new EnemyManager();
+        }   
+        return EnemyManager.instance;
+    }
+
+
     @property(Prefab)
     enemy0:Prefab | null = null;
     @property
@@ -24,6 +37,44 @@ export class EnemyManager extends Component {
     reward2:Prefab | null = null;
     @property
     rewardSpawnRate:number = 3; //奖励生成频率，单位秒
+    @property(AudioClip)
+    bombMusic:AudioClip = null;
+    
+
+    private doubleClickThreshold: number = 0.2;
+    private lastClickTime: number = 0;
+    @property([Node])
+    protected enemyArray:Node[] = [];
+
+    protected onLoad(): void {
+        EnemyManager.instance = this;
+        input.on(Input.EventType.TOUCH_END, this.onTouchStart, this);
+    }
+
+
+    private onTouchStart(event: EventTouch) {
+        const currentTime = Date.now();
+        const timeDiff = (currentTime - this.lastClickTime)/1000; //转换成秒
+        if(timeDiff < this.doubleClickThreshold){
+            this.onDoubleClick(event);
+        }
+        this.lastClickTime = currentTime;
+    }
+    onDoubleClick(event: EventTouch) {
+        if(GameManager.getInstance().isHaveBomb()===false) return;
+        GameManager.getInstance().addBomb(-1);
+        AudioMgr.inst.play(this.bombMusic,1);
+        for(let e of this.enemyArray){
+            const enemy = e.getComponent(Enemy);
+            enemy.killNow();
+        }
+    }
+    removeEnemy(n:Node):void{
+        let index = this.enemyArray.indexOf(n);
+        if(index !== -1){
+            this.enemyArray.splice(index,1);
+        }
+    }
 
     start() {
         this.schedule(() => this.getEnemyPrefab(this.enemy0), this.enemy0SpawnRate);
@@ -41,6 +92,7 @@ export class EnemyManager extends Component {
         this.unschedule(() => this.getEnemyPrefab(this.enemy1));
         this.unschedule(() => this.getEnemyPrefab(this.enemy2));
         this.unschedule(() => this.getEnemyPrefab("reward"));
+        input.off(Input.EventType.TOUCH_END, this.onTouchStart, this);
     }
 
     getEnemyPrefab(enemy:Prefab| string) {
@@ -69,14 +121,17 @@ export class EnemyManager extends Component {
             case this.enemy0:
                 posX = math.randomRangeInt(-215,215);
                 enemyPrefab.setPosition(posX,450,0);
+                this.enemyArray.push(enemyPrefab);
                 break;
             case this.enemy1:
                 posX = math.randomRangeInt(-205,203);
                 enemyPrefab.setPosition(posX,470,0);
+                this.enemyArray.push(enemyPrefab);
                 break;
             case this.enemy2:
                 posX = math.randomRangeInt(-158,156);
                 enemyPrefab.setPosition(posX,550,0);
+                this.enemyArray.push(enemyPrefab);
                 break;
             case this.reward1:
             case this.reward2:
