@@ -2,6 +2,8 @@ import { _decorator, AudioClip, Component, EventTouch, Input, input, instantiate
 import { GameManager } from './GameManager';
 import { Enemy } from './Enemy';
 import { AudioMgr } from './AudioMgr';
+import { ObjectPoolManager } from './ObjectPoolManager';
+import { PoolableObject } from './PoolableObject';
 const { ccclass, property } = _decorator;
 
 @ccclass('EnemyManager')
@@ -46,7 +48,19 @@ export class EnemyManager extends Component {
     @property([Node])
     protected enemyArray:Node[] = [];
 
+    initObjectPools(): void {
+        // 注册敌机0对象池
+        ObjectPoolManager.instance.registerPool('enemies0', this.enemy0, 10, Enemy);
+        // 注册敌机1对象池
+        ObjectPoolManager.instance.registerPool('enemies1', this.enemy1, 10, Enemy);
+        // 注册敌机2对象池
+        ObjectPoolManager.instance.registerPool('enemies2', this.enemy2, 10, Enemy);
+        
+    }
+
+
     protected onLoad(): void {
+        this.initObjectPools();
         EnemyManager.instance = this;
         input.on(Input.EventType.TOUCH_END, this.onTouchStart, this);
     }
@@ -77,9 +91,9 @@ export class EnemyManager extends Component {
     }
 
     start() {
-        this.schedule(() => this.getEnemyPrefab(this.enemy0), this.enemy0SpawnRate);
-        this.schedule(() => this.getEnemyPrefab(this.enemy1), this.enemy1SpawnRate);
-        this.schedule(() => this.getEnemyPrefab(this.enemy2), this.enemy2SpawnRate);
+        this.schedule(() => this.getEnemyPrefab('enemies0'), this.enemy0SpawnRate);
+        this.schedule(() => this.getEnemyPrefab('enemies1'), this.enemy1SpawnRate);
+        this.schedule(() => this.getEnemyPrefab('enemies2'), this.enemy2SpawnRate);
         this.schedule(() => this.getEnemyPrefab("reward"), this.rewardSpawnRate);
     }
 
@@ -88,53 +102,48 @@ export class EnemyManager extends Component {
     }
 
     protected onDestroy(): void {
-        this.unschedule(() => this.getEnemyPrefab(this.enemy0));
-        this.unschedule(() => this.getEnemyPrefab(this.enemy1));
-        this.unschedule(() => this.getEnemyPrefab(this.enemy2));
+        this.unschedule(() => this.getEnemyPrefab('enemies0'));
+        this.unschedule(() => this.getEnemyPrefab('enemies1'));
+        this.unschedule(() => this.getEnemyPrefab('enemies2'));
         this.unschedule(() => this.getEnemyPrefab("reward"));
         input.off(Input.EventType.TOUCH_END, this.onTouchStart, this);
     }
 
-    getEnemyPrefab(enemy:Prefab| string) {
+    getEnemyPrefab(name:string) {
         let prefabToSpawn: Prefab | null = null;
         // 如果是奖励，则随机选择一种奖励生成,否则生成对应的敌机 
-        if (enemy === "reward") {
+        if (name === "reward") {
             if (this.reward1 == null && this.reward2 == null) {
                 console.log("没有奖励可用");
                 return;
             }
             // 随机选择奖励类型
             prefabToSpawn = (math.random() < 0.5) ? (this.reward1 ?? this.reward2) : (this.reward2 ?? this.reward1);
-        } else {
-            prefabToSpawn = enemy as Prefab;
+        } 
+        const enemyPrefab = name === "reward"?instantiate(prefabToSpawn):ObjectPoolManager.instance.get(name);
+        if(name!=="reward") {
+            const poolable1 = enemyPrefab.getComponent(PoolableObject);
+            poolable1.setPoolName(name);
         }
-    
-        if (!prefabToSpawn) {
-            console.log("没有该类型敌机或奖励或 prefab 为 null");
-            return;
-        }
-    
-        const enemyPrefab = instantiate(prefabToSpawn);
         //设置敌机初始位置
         let posX: number;
-        switch(prefabToSpawn){
-            case this.enemy0:
+        switch(name){
+            case 'enemies0':
                 posX = math.randomRangeInt(-215,215);
                 enemyPrefab.setPosition(posX,450,0);
                 this.enemyArray.push(enemyPrefab);
                 break;
-            case this.enemy1:
+            case 'enemies1':
                 posX = math.randomRangeInt(-205,203);
                 enemyPrefab.setPosition(posX,470,0);
                 this.enemyArray.push(enemyPrefab);
                 break;
-            case this.enemy2:
+            case 'enemies2':
                 posX = math.randomRangeInt(-158,156);
                 enemyPrefab.setPosition(posX,550,0);
                 this.enemyArray.push(enemyPrefab);
                 break;
-            case this.reward1:
-            case this.reward2:
+            case 'reward':
                 posX = math.randomRangeInt(-207,207);
                 enemyPrefab.setPosition(posX,477,0);
                 break;

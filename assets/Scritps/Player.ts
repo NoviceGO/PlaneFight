@@ -3,6 +3,9 @@ import { Reward, RewardType } from './Reward';
 import { GameManager } from './GameManager';
 import { LifecountUI } from './UI/LifecountUI';
 import { AudioMgr } from './AudioMgr';
+import { Bullet } from './Bullet';
+import { ObjectPoolManager } from './ObjectPoolManager';
+import { PoolableObject } from './PoolableObject';
 const { ccclass, property } = _decorator;
 
 enum ShootType{
@@ -19,9 +22,9 @@ export class Player extends Component {
     bulletParent: Node | null = null; //子弹的父节点
 
     @property(Prefab)
-    bullet1Prefab: Node | null = null; //子弹预制体
+    bullet1Prefab: Prefab | null = null; //子弹预制体
     @property(Prefab)
-    bullet2Prefab: Node | null = null; //子弹预制体
+    bullet2Prefab: Prefab | null = null; //子弹预制体
 
     //单发子弹发射位置节点
     @property(Node)
@@ -78,7 +81,15 @@ export class Player extends Component {
         this._isPause = value;
     }
 
+    initObjectPools(): void {
+        // 注册子弹对象池
+        console.log("开始注册子弹对象池");
+        ObjectPoolManager.instance.registerPool('bullets1', this.bullet1Prefab, 30, Bullet);
+        ObjectPoolManager.instance.registerPool('bullets2', this.bullet2Prefab, 30, Bullet);
+    }
+
     protected onLoad(): void {
+        this.initObjectPools();
         input.on(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
 
         this.collider = this.node.getChildByName("Body").getComponent(Collider2D);   
@@ -214,7 +225,12 @@ export class Player extends Component {
         this.shootTimer += dt; //累加时间
         if (this.shootTimer >= this.shootRate) {   //达到发射频率   
             this.shootTimer = 0; //重置计时器
-            const bullet1 = instantiate(this.bullet1Prefab); //实例化子弹, 相当于克隆预制体中的子弹 
+            // const bullet1 = instantiate(this.bullet1Prefab); //实例化子弹, 相当于克隆预制体中的子弹 
+            const bullet1 = ObjectPoolManager.instance.get('bullets1');
+            const poolable = bullet1.getComponent(PoolableObject);
+            if (poolable) {
+                poolable.setPoolName('bullets1');
+            } 
             this.bulletParent.addChild(bullet1); //将子弹添加到父节点下
             //设置子弹位置为发射位置,使用世界坐标,避免层级关系带来的位置偏移, 否则子弹位置会有偏差
             bullet1.setWorldPosition(this.bullet1Position.getWorldPosition());
@@ -235,10 +251,18 @@ export class Player extends Component {
         this.shootTimer += dt; //累加时间
         if(this.shootTimer >= this.shootRate){   //达到发射频率
             this.shootTimer = 0; //重置计时器
-            const bullet1 = instantiate(this.bullet2Prefab);
-            const bullet2 = instantiate(this.bullet2Prefab);
+            // const bullet1 = instantiate(this.bullet2Prefab);
+            // const bullet2 = instantiate(this.bullet2Prefab);
+            const bullet1 = ObjectPoolManager.instance.get('bullets2');
+            const bullet2 = ObjectPoolManager.instance.get('bullets2');
+            const poolable1 = bullet1.getComponent(PoolableObject);
+            const poolable2 = bullet2.getComponent(PoolableObject);
+            if (poolable1&&poolable2) {
+                poolable1.setPoolName('bullets2');
+                poolable2.setPoolName('bullets2');
+            } 
             this.bulletParent.addChild(bullet1);
-            this.bulletParent.addChild(bullet2);
+            this.bulletParent.addChild(bullet2);   
             // //设置子弹位置为发射位置,使用世界坐标,避免层级关系带来的位置偏移, 否则子弹位置会有偏差
             bullet1.setWorldPosition(this.bullet2_1Position.getWorldPosition());
             bullet2.setWorldPosition(this.bullet2_2Position.getWorldPosition());

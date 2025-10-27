@@ -2,10 +2,12 @@ import { _decorator, Animation, AudioClip, Collider2D, Component, Contact2DType,
 import { GameManager } from './GameManager';
 import { EnemyManager } from './EnemyManager';
 import { AudioMgr } from './AudioMgr';
+import { PoolableObject } from './PoolableObject';
+import { Bullet } from './Bullet';
 const { ccclass, property } = _decorator;
 
 @ccclass('Enemy')
-export class Enemy extends Component {
+export class Enemy extends PoolableObject{
 
     @property
     speed: number = 300;
@@ -41,12 +43,13 @@ export class Enemy extends Component {
     onBeginContact( selfCollider: Collider2D, otherCollider: Collider2D, contact?: any ) {
         // 处理碰撞逻辑
         this.hp -= 1;
-        
-        if(otherCollider.getComponent('Bullet')){
+        const bullet = otherCollider.getComponent(Bullet);
+        if(bullet){
             // 碰撞到子弹
-            otherCollider.enabled = false; // 禁用碰撞体，防止重复碰撞
-            otherCollider.getComponent(Sprite).enabled = false; // 隐藏子弹
+            // otherCollider.enabled = false; // 禁用碰撞体，防止重复碰撞
+            // otherCollider.getComponent(Sprite).enabled = false; // 隐藏子弹
             //  otherCollider.node.destroy(); // 销毁子弹节点
+            bullet.onCollisionEnter();
         }
 
         if(this.hp>0){
@@ -62,9 +65,10 @@ export class Enemy extends Component {
             this.node.setPosition(p.x, p.y - this.speed * deltaTime, p.z);
         }
 
-        //判断敌机是否超出屏幕下方，超出则销毁
+        //判断敌机是否超出屏幕下方，超出则回收
         if(this.node.position.y < -520){
-            this.node.destroy();
+            // this.node.destroy();
+            this.recycle();
         }
     }
 
@@ -81,19 +85,21 @@ export class Enemy extends Component {
         this.animation.play(this.animationDown);
         // 播放完爆炸动画后销毁敌机节点
         if(this.collider) this.collider.enabled = false; // 禁用碰撞体，防止重复碰撞
-        this.scheduleOnce(()=>{
-            this.node.destroy();
-        }, 1); // 等待动画播放完毕后销毁节点
+        // this.scheduleOnce(()=>{
+        //     this.node.destroy();
+        // }, 1); // 等待动画播放完毕后销毁节点
         AudioMgr.inst.play(this.enemyAudio,0.8);
         GameManager.getInstance().addScoreTotal(this.score);
         this.haveDead = true;
+        this.recycle();
+
     }
 
     killNow():void{
         if(this.hp<=0) return;
         this.dead();
-
     }
+
 }
 
 
